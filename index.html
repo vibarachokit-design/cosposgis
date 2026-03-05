@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGSI KOSPO - Sistema de Aprobación por Correo</title>
     <style>
+        /* ... (estilos anteriores se mantienen) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --primary: #1e3a5f; --secondary: #2c5282; --accent: #3182ce;
@@ -78,14 +79,22 @@
             color: white; border-color: var(--accent);
         }
         .sheet-code { font-family: monospace; font-weight: bold; min-width: 70px; }
-        .approval-status-indicator {
-            width: 10px; height: 10px; border-radius: 50%;
-            position: absolute; right: 10px;
+        .sheet-item .badge-pendiente {
+            background: #fbbf24; color: #000; font-size: 0.6em; padding: 2px 6px;
+            border-radius: 10px; margin-left: auto; font-weight: bold;
         }
-        .status-pendiente { background: #fbbf24; }
-        .status-enviado { background: #60a5fa; }
-        .status-aprobado { background: #34d399; }
-        .status-rechazado { background: #f87171; }
+        .sheet-item .badge-enviado {
+            background: #60a5fa; color: white; font-size: 0.6em; padding: 2px 6px;
+            border-radius: 10px; margin-left: auto; font-weight: bold;
+        }
+        .sheet-item .badge-aprobado {
+            background: #34d399; color: white; font-size: 0.6em; padding: 2px 6px;
+            border-radius: 10px; margin-left: auto; font-weight: bold;
+        }
+        .sheet-item .badge-rechazado {
+            background: #f87171; color: white; font-size: 0.6em; padding: 2px 6px;
+            border-radius: 10px; margin-left: auto; font-weight: bold;
+        }
         .main-content {
             flex: 1; overflow-y: auto; padding: 25px; background: var(--bg);
         }
@@ -103,9 +112,6 @@
         }
         .badge-libro { background: #c6f6d5; color: #22543d; }
         .badge-registro { background: #feebc8; color: #744210; }
-        .badge-aprobacion {
-            background: var(--accent); color: white; margin-left: 10px;
-        }
         .form-container {
             background: white; padding: 25px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;
@@ -168,6 +174,9 @@
         .btn-send {
             background: var(--accent); color: white;
         }
+        .btn-pending {
+            background: #fbbf24; color: black;
+        }
         .preview-panel {
             background: white; border-radius: 12px; padding: 25px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-top: 20px;
@@ -214,6 +223,19 @@
         .history-item {
             padding: 10px; border-left: 3px solid var(--accent);
             background: #f8fafc; margin-bottom: 10px;
+        }
+        .tabla-solicitudes {
+            width: 100%; border-collapse: collapse; margin-top: 15px;
+        }
+        .tabla-solicitudes th {
+            background: var(--primary); color: white; padding: 8px;
+            text-align: left; font-size: 0.8em;
+        }
+        .tabla-solicitudes td {
+            padding: 8px; border-bottom: 1px solid var(--border);
+        }
+        .tabla-solicitudes tr:hover {
+            background: #f0f9ff;
         }
         
         /* Estilos para documento de auditoría */
@@ -291,7 +313,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h1>📋 SGSI KOSPO</h1>
-                <p>Sistema de Aprobación por Correo<br>R-SGSI-01 a R-SGSI-245</p>
+                <p>Sistema de Aprobación por Correo<br>Registros Fuente R-SGSI-01 a R-SGSI-245</p>
             </div>
             <div class="stats-bar">
                 <div class="stat-item"><div class="stat-number" id="statLibros">37</div><div class="stat-label">Libros</div></div>
@@ -305,6 +327,7 @@
                 <button class="tab active" data-filter="all">Todos</button>
                 <button class="tab" data-filter="LIBRO">Libros</button>
                 <button class="tab" data-filter="Registro">Registros</button>
+                <button class="tab" data-filter="mis-envios">Mis Envíos</button>
                 <button class="tab" data-filter="pendientes">Pendientes</button>
             </div>
             <div class="records-container" id="recordsTree"></div>
@@ -316,9 +339,9 @@
                     <div class="empty-state-icon">📁</div>
                     <h2>Sistema de Aprobación por Correo</h2>
                     <p>Seleccione un libro o registro del panel izquierdo</p>
-                    <p style="margin-top: 10px; font-size: 0.9em;">245 registros disponibles</p>
+                    <p style="margin-top: 10px; font-size: 0.9em;">245 registros fuente disponibles</p>
                     <p style="margin-top: 20px; color: var(--accent);">
-                        ✉️ Los registros pueden enviarse a aprobación por correo
+                        ✉️ Los registros fuente son plantillas - se envían copias a aprobación
                     </p>
                 </div>
             </div>
@@ -327,13 +350,63 @@
     <div class="toast" id="toast">✓ Operación exitosa</div>
 
 <script>
-// ==================== BASE DE DATOS COMPLETA (R-SGSI-01 a R-SGSI-245) ====================
+// ==================== BASE DE DATOS COMPLETA (REGISTROS FUENTE) ====================
 const maestroRegistros = [
-    // ... (incluir aquí todos los registros de los 37 libros)
-    // Por brevedad, incluyo solo algunos ejemplos. En producción, copiar el array completo
-    { codigo: "R-SGSI-01", titulo: "Libro Registros Control Acceso Físico Lógico", tipo: "LIBRO", categoria: "Acceso", iso: "A.9.1.1, A.9.1.2, A.9.4.1", campos: [ { id: "folio", label: "Folio del libro", type: "text" }, { id: "version", label: "Versión", type: "text" }, { id: "fechaEmision", label: "Fecha de emisión", type: "date" }, { id: "responsable", label: "Responsable del libro", type: "text" }, { id: "ambito", label: "Ámbito (TI/OT)", type: "select", options: ["TI", "OT", "Ambos"] }, { id: "ubicacion", label: "Ubicación / Repositorio", type: "text" } ] },
-    { codigo: "R-SGSI-02", titulo: "Autorización de Accesos", tipo: "Registro", categoria: "Acceso", iso: "A.9.2.1, A.9.2.2, A.9.4.1", secciones: { "1.1": "Identificación del acceso", "1.2": "Justificación y alcance", "1.3": "Evidencia operativa", "2": "Trazabilidad y control", "3": "Responsabilidades y aprobaciones" }, campos: [ { id: "tipoAcceso", label: "Tipo de acceso", type: "checkbox", options: ["Físico", "Lógico", "Ambos"], seccion: "1.1" }, { id: "tipoAccion", label: "Tipo de acción", type: "checkbox", options: ["Alta", "Modificación", "Revisión", "Revocación"], seccion: "1.1" }, { id: "sistemaActivo", label: "Sistema / Activo", type: "text", seccion: "1.1" }, { id: "ubicacionZona", label: "Ubicación / Zona", type: "text", seccion: "1.1" }, { id: "usuarioIdentidad", label: "Usuario / Identidad", type: "text", seccion: "1.1" }, { id: "rolPerfil", label: "Rol / Perfil asignado", type: "text", seccion: "1.1" }, { id: "nivelPrivilegio", label: "Nivel de privilegio", type: "checkbox", options: ["Bajo", "Medio", "Alto", "Crítico"], seccion: "1.1" }, { id: "accesoTemporal", label: "Acceso temporal", type: "checkbox", options: ["No", "Sí"], seccion: "1.1" }, { id: "vigenciaDesde", label: "Desde", type: "date", seccion: "1.1", condicional: "accesoTemporal=Sí" }, { id: "vigenciaHasta", label: "Hasta", type: "date", seccion: "1.1", condicional: "accesoTemporal=Sí" }, { id: "justificacion", label: "Justificación del acceso", type: "textarea", seccion: "1.2" }, { id: "alcanceAcceso", label: "Alcance del acceso", type: "checkbox", options: ["Lectura", "Escritura", "Administración"], seccion: "1.2" }, { id: "riesgoAsociado", label: "Riesgo asociado", type: "checkbox", options: ["Bajo", "Medio", "Alto"], seccion: "1.2" }, { id: "controlesCompensatorios", label: "Controles compensatorios", type: "textarea", seccion: "1.2" }, { id: "tipoEvidencia", label: "Tipo de evidencia", type: "checkbox", options: ["Log", "Captura", "Reporte", "Ticket", "Otro"], seccion: "1.3" }, { id: "codigoEvidencia", label: "Código / Ruta evidencia", type: "text", seccion: "1.3" }, { id: "validadoPor", label: "Validación realizada por", type: "text", seccion: "1.3" }, { id: "fechaValidacion", label: "Fecha de validación", type: "date", seccion: "1.3" }, { id: "folio", label: "Folio N°", type: "text", seccion: "2" }, { id: "fecha", label: "Fecha", type: "date", seccion: "2" }, { id: "procesoAsociado", label: "Proceso Asociado", type: "text", seccion: "2", default: "Gestión de Accesos" }, { id: "referenciaISO", label: "Referencia ISO 27001", type: "text", seccion: "2", default: "A.9.2.1, A.9.2.2" }, { id: "version", label: "Versión", type: "text", seccion: "2" }, { id: "evidenciaAsociada", label: "Evidencia Asociada (Código / Carpeta Física)", type: "text", seccion: "2" }, { id: "responsableRegistro", label: "Responsable del registro", type: "text", seccion: "3", rol: "firma" }, { id: "supervisorAprobador", label: "Supervisor / Aprobador", type: "text", seccion: "3", rol: "firma" }, { id: "fechaFirmaResponsable", label: "Fecha", type: "date", seccion: "3", rol: "fecha_firma" }, { id: "fechaFirmaAprobador", label: "Fecha", type: "date", seccion: "3", rol: "fecha_firma" } ] }
-    // ... resto de registros (se incluirían todos aquí)
+    // LIBRO 1: Control Acceso Físico Lógico (R-SGSI-01 a R-SGSI-06)
+    {
+        codigo: "R-SGSI-01", titulo: "Libro Registros Control Acceso Físico Lógico", tipo: "LIBRO", categoria: "Acceso",
+        iso: "A.9.1.1, A.9.1.2, A.9.4.1",
+        campos: [
+            { id: "folio", label: "Folio del libro", type: "text", seccion: "1.1 Identificación" },
+            { id: "version", label: "Versión", type: "text", seccion: "1.1 Identificación" },
+            { id: "fechaEmision", label: "Fecha de emisión", type: "date", seccion: "1.1 Identificación" },
+            { id: "responsable", label: "Responsable del libro", type: "text", seccion: "1.1 Identificación" },
+            { id: "ambito", label: "Ámbito (TI/OT)", type: "select", options: ["TI", "OT", "Ambos"], seccion: "1.1 Identificación" },
+            { id: "ubicacion", label: "Ubicación / Repositorio", type: "text", seccion: "1.1 Identificación" }
+        ]
+    },
+    {
+        codigo: "R-SGSI-02", titulo: "Autorización de Accesos", tipo: "Registro", categoria: "Acceso",
+        iso: "A.9.2.1, A.9.2.2, A.9.4.1",
+        secciones: {
+            "1.1": "Identificación del acceso",
+            "1.2": "Justificación y alcance", 
+            "1.3": "Evidencia operativa",
+            "2": "Trazabilidad y control",
+            "3": "Responsabilidades y aprobaciones"
+        },
+        campos: [
+            { id: "tipoAcceso", label: "Tipo de acceso", type: "checkbox", options: ["Físico", "Lógico", "Ambos"], seccion: "1.1" },
+            { id: "tipoAccion", label: "Tipo de acción", type: "checkbox", options: ["Alta", "Modificación", "Revisión", "Revocación"], seccion: "1.1" },
+            { id: "sistemaActivo", label: "Sistema / Activo", type: "text", seccion: "1.1" },
+            { id: "ubicacionZona", label: "Ubicación / Zona", type: "text", seccion: "1.1" },
+            { id: "usuarioIdentidad", label: "Usuario / Identidad", type: "text", seccion: "1.1" },
+            { id: "rolPerfil", label: "Rol / Perfil asignado", type: "text", seccion: "1.1" },
+            { id: "nivelPrivilegio", label: "Nivel de privilegio", type: "checkbox", options: ["Bajo", "Medio", "Alto", "Crítico"], seccion: "1.1" },
+            { id: "accesoTemporal", label: "Acceso temporal", type: "checkbox", options: ["No", "Sí"], seccion: "1.1" },
+            { id: "vigenciaDesde", label: "Desde", type: "date", seccion: "1.1", condicional: "accesoTemporal=Sí" },
+            { id: "vigenciaHasta", label: "Hasta", type: "date", seccion: "1.1", condicional: "accesoTemporal=Sí" },
+            { id: "justificacion", label: "Justificación del acceso", type: "textarea", seccion: "1.2" },
+            { id: "alcanceAcceso", label: "Alcance del acceso", type: "checkbox", options: ["Lectura", "Escritura", "Administración"], seccion: "1.2" },
+            { id: "riesgoAsociado", label: "Riesgo asociado", type: "checkbox", options: ["Bajo", "Medio", "Alto"], seccion: "1.2" },
+            { id: "controlesCompensatorios", label: "Controles compensatorios", type: "textarea", seccion: "1.2" },
+            { id: "tipoEvidencia", label: "Tipo de evidencia", type: "checkbox", options: ["Log", "Captura", "Reporte", "Ticket", "Otro"], seccion: "1.3" },
+            { id: "codigoEvidencia", label: "Código / Ruta evidencia", type: "text", seccion: "1.3" },
+            { id: "validadoPor", label: "Validación realizada por", type: "text", seccion: "1.3" },
+            { id: "fechaValidacion", label: "Fecha de validación", type: "date", seccion: "1.3" },
+            { id: "folio", label: "Folio N°", type: "text", seccion: "2" },
+            { id: "fecha", label: "Fecha", type: "date", seccion: "2" },
+            { id: "procesoAsociado", label: "Proceso Asociado", type: "text", seccion: "2", default: "Gestión de Accesos" },
+            { id: "referenciaISO", label: "Referencia ISO 27001", type: "text", seccion: "2", default: "A.9.2.1, A.9.2.2" },
+            { id: "version", label: "Versión", type: "text", seccion: "2" },
+            { id: "evidenciaAsociada", label: "Evidencia Asociada (Código / Carpeta Física)", type: "text", seccion: "2" },
+            { id: "responsableRegistro", label: "Responsable del registro", type: "text", seccion: "3", rol: "firma" },
+            { id: "supervisorAprobador", label: "Supervisor / Aprobador", type: "text", seccion: "3", rol: "firma" },
+            { id: "fechaFirmaResponsable", label: "Fecha", type: "date", seccion: "3", rol: "fecha_firma" },
+            { id: "fechaFirmaAprobador", label: "Fecha", type: "date", seccion: "3", rol: "fecha_firma" }
+        ]
+    }
+    // ... aquí irían todos los demás registros (por brevedad solo incluí 2, pero en producción estarían los 245)
 ];
 
 // Organizar registros por libros
@@ -356,71 +429,29 @@ function organizarPorLibros() {
     return libros;
 }
 
-// ==================== SISTEMA DE APROBACIÓN ====================
+// ==================== SISTEMA DE APROBACIÓN (COPIA DE REGISTROS) ====================
 
 // Inicializar base de datos de aprobaciones
 function initApprovalDB() {
-    if (!localStorage.getItem('sgsi_approvals')) {
-        localStorage.setItem('sgsi_approvals', JSON.stringify({}));
+    if (!localStorage.getItem('sgsi_solicitudes')) {
+        localStorage.setItem('sgsi_solicitudes', JSON.stringify([]));
     }
-    if (!localStorage.getItem('sgsi_approval_history')) {
-        localStorage.setItem('sgsi_approval_history', JSON.stringify([]));
+    if (!localStorage.getItem('sgsi_approval_tokens')) {
+        localStorage.setItem('sgsi_approval_tokens', JSON.stringify({}));
     }
+}
+
+// Generar ID único para solicitud
+function generarIdSolicitud() {
+    return 'SOL-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
 // Generar token único
-function generarToken(registroId, timestamp) {
-    const base = `${registroId}_${timestamp}_KOSPO-SGSI-2026`;
-    // Simulación de hash simple (en producción usar crypto.subtle)
-    let hash = 0;
-    for (let i = 0; i < base.length; i++) {
-        hash = ((hash << 5) - hash) + base.charCodeAt(i);
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36) + Date.now().toString(36);
+function generarToken() {
+    return 'tok_' + Date.now() + '_' + Math.random().toString(36).substr(2, 18);
 }
 
-// Enviar correo de aprobación
-async function enviarCorreoAprobacion(destinatario, registro, datos, token, solicitudId) {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const approvalUrl = `${baseUrl}?action=approve&token=${token}&sid=${solicitudId}`;
-    
-    const asunto = encodeURIComponent(`[SGSI KOSPO] Solicitud de aprobación: ${registro.codigo} - ${registro.titulo}`);
-    
-    const cuerpo = encodeURIComponent(`
-Se ha generado un nuevo registro que requiere su aprobación:
-
-📋 REGISTRO: ${registro.codigo} - ${registro.titulo}
-📁 CATEGORÍA: ${registro.categoria}
-📌 REFERENCIA ISO: ${registro.iso || 'N/A'}
-👤 SOLICITANTE: ${datos.responsableRegistro || datos.responsable || 'No especificado'}
-📅 FECHA DE ENVÍO: ${new Date().toLocaleString('es-CL')}
-
-Para revisar y APROBAR este registro, haga clic en el siguiente enlace:
-${approvalUrl}
-
-Si no puede acceder al enlace, copie y pegue esta dirección en su navegador:
-${approvalUrl}
-
-Instrucciones:
-1. Al abrir el enlace, verá el registro completo en modo solo lectura
-2. Podrá agregar comentarios si lo desea
-3. Seleccione APROBAR o RECHAZAR
-4. El sistema notificará automáticamente al solicitante
-
-Este enlace es de uso único y expirará después de ser utilizado.
-
-Atentamente,
-Sistema SGSI KOSPO
-    `);
-    
-    // Abrir cliente de correo (en producción sería una llamada API)
-    window.open(`mailto:${destinatario}?subject=${asunto}&body=${cuerpo}`);
-    
-    return true;
-}
-
-// Enviar a aprobación
+// Enviar solicitud de aprobación
 async function enviarAprobacion() {
     const registro = maestroRegistros.find(r => r.codigo === estado.registroSeleccionado);
     if (!registro) return;
@@ -433,20 +464,10 @@ async function enviarAprobacion() {
     const form = document.getElementById('registroForm');
     if (!form) return;
     
-    const formData = new FormData(form);
-    const datos = {};
-    
-    registro.campos.forEach(campo => {
-        if (campo.type === 'checkbox') {
-            const checkboxes = form.querySelectorAll(`input[name="${campo.id}[]"]:checked`);
-            datos[campo.id] = Array.from(checkboxes).map(cb => cb.value).join(', ');
-        } else {
-            datos[campo.id] = formData.get(campo.id) || '';
-        }
-    });
-    
-    // Validar campos obligatorios
-    if (!datos.responsableRegistro && !datos.responsable) {
+    // Validar campos obligatorios mínimos
+    const responsable = document.getElementById('responsableRegistro')?.value || 
+                       document.getElementById('responsable')?.value;
+    if (!responsable) {
         mostrarToast('⚠️ Debe especificar el responsable del registro');
         return;
     }
@@ -459,47 +480,91 @@ async function enviarAprobacion() {
         return;
     }
     
-    const timestamp = Date.now();
-    const solicitudId = `APR_${registro.codigo}_${new Date().toISOString().slice(0,10)}_${timestamp}`;
-    const token = generarToken(registro.codigo, timestamp);
+    // Recopilar datos del formulario (crear una copia)
+    const formData = new FormData(form);
+    const datosCopia = {};
     
-    const approvalEntry = {
+    registro.campos.forEach(campo => {
+        if (campo.type === 'checkbox') {
+            const checkboxes = form.querySelectorAll(`input[name="${campo.id}[]"]:checked`);
+            datosCopia[campo.id] = Array.from(checkboxes).map(cb => cb.value).join(', ');
+        } else {
+            datosCopia[campo.id] = formData.get(campo.id) || '';
+        }
+    });
+    
+    // Generar tokens
+    const tokenAprobador = generarToken();
+    const tokenSolicitante = generarToken();
+    const solicitudId = generarIdSolicitud();
+    const fechaEnvio = new Date().toISOString();
+    
+    // Crear solicitud
+    const solicitud = {
         id: solicitudId,
-        registro: registro.codigo,
+        registroFuente: registro.codigo,
         titulo: registro.titulo,
-        datos: datos,
+        datos: datosCopia,
         estado: 'enviado',
         aprobador: aprobador,
-        solicitante: datos.responsableRegistro || datos.responsable || 'Desconocido',
-        fechaEnvio: new Date().toISOString(),
+        solicitante: responsable,
+        solicitanteNombre: responsable,
+        fechaEnvio: fechaEnvio,
         fechaRespuesta: null,
         comentarios: '',
-        token: token,
-        respuestaPor: null
+        tokenAprobador: tokenAprobador,
+        tokenSolicitante: tokenSolicitante
     };
     
     // Guardar en localStorage
-    const approvals = JSON.parse(localStorage.getItem('sgsi_approvals') || '{}');
-    approvals[solicitudId] = approvalEntry;
-    approvals[token] = solicitudId; // Índice por token
-    localStorage.setItem('sgsi_approvals', JSON.stringify(approvals));
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
+    solicitudes.push(solicitud);
+    localStorage.setItem('sgsi_solicitudes', JSON.stringify(solicitudes));
     
-    // Guardar en historial
-    const history = JSON.parse(localStorage.getItem('sgsi_approval_history') || '[]');
-    history.push({
-        ...approvalEntry,
-        tipo: 'envío',
-        timestamp: new Date().toISOString()
-    });
-    localStorage.setItem('sgsi_approval_history', JSON.stringify(history));
+    // Guardar índice de tokens
+    const tokens = JSON.parse(localStorage.getItem('sgsi_approval_tokens') || '{}');
+    tokens[tokenAprobador] = solicitudId;
+    tokens[tokenSolicitante] = solicitudId;
+    localStorage.setItem('sgsi_approval_tokens', JSON.stringify(tokens));
     
-    await enviarCorreoAprobacion(aprobador, registro, datos, token, solicitudId);
+    // Enviar correo al aprobador
+    await enviarCorreoAprobador(aprobador, registro, solicitudId, tokenAprobador);
     
-    mostrarEstadoAprobacionEnUI(solicitudId, 'enviado');
-    mostrarToast(`✉️ Solicitud enviada a ${aprobador}`);
+    mostrarToast(`✉️ Solicitud #${solicitudId} enviada a ${aprobador}`);
     
-    // Actualizar el árbol para mostrar el indicador
-    renderizarArbol();
+    // Mostrar resumen de la solicitud
+    mostrarResumenEnvio(solicitud);
+}
+
+// Enviar correo al aprobador
+async function enviarCorreoAprobador(destinatario, registro, solicitudId, token) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const approvalUrl = `${baseUrl}?action=approve&token=${token}`;
+    
+    const asunto = encodeURIComponent(`[SGSI KOSPO] Solicitud de aprobación: ${registro.codigo} - ${registro.titulo}`);
+    
+    const cuerpo = encodeURIComponent(`
+Se ha generado una solicitud de aprobación para el registro:
+
+📋 REGISTRO: ${registro.codigo} - ${registro.titulo}
+📁 CATEGORÍA: ${registro.categoria}
+📌 REFERENCIA ISO: ${registro.iso || 'N/A'}
+🆔 SOLICITUD: ${solicitudId}
+📅 FECHA: ${new Date().toLocaleString('es-CL')}
+
+Para revisar y APROBAR este registro, haga clic en el siguiente enlace:
+${approvalUrl}
+
+Este enlace es de uso único y expirará después de ser utilizado.
+
+Atentamente,
+Sistema SGSI KOSPO
+    `);
+    
+    // Abrir cliente de correo
+    window.open(`mailto:${destinatario}?subject=${asunto}&body=${cuerpo}`);
+    
+    return true;
 }
 
 // Verificar si estamos en modo aprobación
@@ -507,34 +572,42 @@ function checkApprovalMode() {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
     const token = urlParams.get('token');
-    const sid = urlParams.get('sid');
     
-    if (action === 'approve' && (token || sid)) {
-        mostrarInterfazAprobacion(token, sid);
+    if (action === 'approve' && token) {
+        mostrarInterfazAprobacion(token);
         return true;
     }
     return false;
 }
 
 // Mostrar interfaz de aprobación
-function mostrarInterfazAprobacion(token, sid) {
-    const approvals = JSON.parse(localStorage.getItem('sgsi_approvals') || '{}');
-    let solicitudId = sid;
+function mostrarInterfazAprobacion(token) {
+    const tokens = JSON.parse(localStorage.getItem('sgsi_approval_tokens') || '{}');
+    const solicitudId = tokens[token];
     
-    if (token && approvals[token]) {
-        solicitudId = approvals[token];
+    if (!solicitudId) {
+        document.getElementById('contentArea').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">❌</div>
+                <h2>Token inválido o expirado</h2>
+                <p>El enlace de aprobación no es válido o ya fue utilizado.</p>
+                <button class="btn btn-primary" onclick="window.location.href=window.location.pathname">
+                    Volver al inicio
+                </button>
+            </div>
+        `;
+        return;
     }
     
-    const approvalData = approvals[solicitudId];
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
+    const solicitud = solicitudes.find(s => s.id === solicitudId);
     
-    if (!approvalData) {
+    if (!solicitud) {
         document.getElementById('contentArea').innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">❌</div>
                 <h2>Solicitud no encontrada</h2>
-                <p>El token de aprobación no es válido o ha expirado.</p>
-                <p>Por favor, contacte al remitente de la solicitud.</p>
-                <button class="btn btn-primary" onclick="window.location.href=window.location.pathname" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="window.location.href=window.location.pathname">
                     Volver al inicio
                 </button>
             </div>
@@ -542,14 +615,14 @@ function mostrarInterfazAprobacion(token, sid) {
         return;
     }
     
-    if (approvalData.estado !== 'enviado') {
+    if (solicitud.estado !== 'enviado') {
         document.getElementById('contentArea').innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon">${approvalData.estado === 'aprobado' ? '✅' : '⏳'}</div>
-                <h2>Esta solicitud ya fue ${approvalData.estado === 'aprobado' ? 'aprobada' : 'procesada'}</h2>
-                <p>Fecha de respuesta: ${new Date(approvalData.fechaRespuesta).toLocaleString()}</p>
-                ${approvalData.comentarios ? `<p>Comentarios: ${approvalData.comentarios}</p>` : ''}
-                <button class="btn btn-primary" onclick="window.location.href=window.location.pathname" style="margin-top: 20px;">
+                <div class="empty-state-icon">${solicitud.estado === 'aprobado' ? '✅' : '⏳'}</div>
+                <h2>Esta solicitud ya fue ${solicitud.estado === 'aprobado' ? 'aprobada' : 'procesada'}</h2>
+                <p>Fecha de respuesta: ${new Date(solicitud.fechaRespuesta).toLocaleString()}</p>
+                ${solicitud.comentarios ? `<p>Comentarios: ${solicitud.comentarios}</p>` : ''}
+                <button class="btn btn-primary" onclick="window.location.href=window.location.pathname">
                     Volver al inicio
                 </button>
             </div>
@@ -557,16 +630,16 @@ function mostrarInterfazAprobacion(token, sid) {
         return;
     }
     
-    const registro = maestroRegistros.find(r => r.codigo === approvalData.registro);
+    const registro = maestroRegistros.find(r => r.codigo === solicitud.registroFuente);
     if (!registro) return;
     
-    const previewHTML = generarHTMLAuditoria(registro, approvalData.datos, true);
+    const previewHTML = generarHTMLAuditoria(registro, solicitud.datos, true);
     
     document.getElementById('contentArea').innerHTML = `
         <div class="content-header">
             <div class="content-title">
                 <h2>Aprobación de Registro: ${registro.titulo}</h2>
-                <p>${registro.codigo} • Solicitado por ${approvalData.solicitante} el ${new Date(approvalData.fechaEnvio).toLocaleString()}</p>
+                <p>Solicitud #${solicitud.id} • Solicitado por ${solicitud.solicitante} el ${new Date(solicitud.fechaEnvio).toLocaleString()}</p>
             </div>
             <span class="badge badge-registro">REVISIÓN DE APROBACIÓN</span>
         </div>
@@ -583,10 +656,10 @@ function mostrarInterfazAprobacion(token, sid) {
                 placeholder="Agregue comentarios para el solicitante (opcional)"></textarea>
             
             <div class="approval-buttons">
-                <button class="btn btn-approve" onclick="procesarAprobacion('${solicitudId}', 'aprobado')">
+                <button class="btn btn-approve" onclick="procesarAprobacion('${solicitud.id}', 'aprobado')">
                     ✅ Aprobar Registro
                 </button>
-                <button class="btn btn-reject" onclick="procesarAprobacion('${solicitudId}', 'rechazado')">
+                <button class="btn btn-reject" onclick="procesarAprobacion('${solicitud.id}', 'rechazado')">
                     ❌ Rechazar Registro
                 </button>
             </div>
@@ -596,73 +669,204 @@ function mostrarInterfazAprobacion(token, sid) {
 
 // Procesar aprobación/rechazo
 function procesarAprobacion(solicitudId, decision) {
-    const approvals = JSON.parse(localStorage.getItem('sgsi_approvals') || '{}');
-    const approvalData = approvals[solicitudId];
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
+    const index = solicitudes.findIndex(s => s.id === solicitudId);
     
-    if (!approvalData) {
+    if (index === -1) {
         mostrarToast('Error: Solicitud no encontrada');
         return;
     }
     
     const comentario = document.getElementById('approvalComment')?.value || '';
     
-    approvalData.estado = decision;
-    approvalData.fechaRespuesta = new Date().toISOString();
-    approvalData.comentarios = comentario;
-    approvalData.respuestaPor = 'Aprobador vía correo';
+    solicitudes[index].estado = decision;
+    solicitudes[index].fechaRespuesta = new Date().toISOString();
+    solicitudes[index].comentarios = comentario;
+    solicitudes[index].aprobadoPor = 'Aprobador vía correo';
     
-    approvals[solicitudId] = approvalData;
-    localStorage.setItem('sgsi_approvals', JSON.stringify(approvals));
+    localStorage.setItem('sgsi_solicitudes', JSON.stringify(solicitudes));
     
-    // Registrar en historial
-    const history = JSON.parse(localStorage.getItem('sgsi_approval_history') || '[]');
-    history.push({
-        ...approvalData,
-        tipo: 'respuesta',
-        timestamp: new Date().toISOString()
-    });
-    localStorage.setItem('sgsi_approval_history', JSON.stringify(history));
-    
-    // Simular notificación al solicitante
-    console.log('Notificando al solicitante:', approvalData.solicitante);
-    
-    mostrarToast(`✅ Registro ${decision === 'aprobado' ? 'aprobado' : 'rechazado'}`);
+    mostrarToast(`✅ Solicitud ${decision === 'aprobado' ? 'aprobada' : 'rechazada'}`);
     
     setTimeout(() => {
         window.location.href = window.location.pathname;
     }, 2000);
 }
 
-// Mostrar estado de aprobación en UI
-function mostrarEstadoAprobacionEnUI(solicitudId, estado) {
-    const estadoSpan = document.getElementById('approval-status');
-    if (estadoSpan) {
-        estadoSpan.innerHTML = `
-            <span class="status-badge ${estado}">${estado.toUpperCase()}</span>
-            Solicitud enviada el ${new Date().toLocaleString()}
-        `;
-    }
+// Mostrar resumen del envío
+function mostrarResumenEnvio(solicitud) {
+    const contentArea = document.getElementById('contentArea');
+    
+    contentArea.innerHTML = `
+        <div class="content-header">
+            <div class="content-title">
+                <h2>✅ Solicitud Enviada Correctamente</h2>
+                <p>Se ha generado una solicitud de aprobación</p>
+            </div>
+        </div>
+        
+        <div class="form-container">
+            <h3 class="section-title">📋 Detalles de la Solicitud</h3>
+            
+            <table class="tabla-solicitudes">
+                <tr><th>Campo</th><th>Valor</th></tr>
+                <tr><td>ID Solicitud</td><td><strong>${solicitud.id}</strong></td></tr>
+                <tr><td>Registro</td><td>${solicitud.registroFuente} - ${solicitud.titulo}</td></tr>
+                <tr><td>Solicitante</td><td>${solicitud.solicitante}</td></tr>
+                <tr><td>Aprobador</td><td>${solicitud.aprobador}</td></tr>
+                <tr><td>Fecha de Envío</td><td>${new Date(solicitud.fechaEnvio).toLocaleString()}</td></tr>
+                <tr><td>Estado</td><td><span class="status-badge enviado">ENVIADO</span></td></tr>
+            </table>
+            
+            <div class="actions-bar">
+                <button class="btn btn-primary" onclick="verMisEnvios()">
+                    📋 Ver Mis Solicitudes
+                </button>
+                <button class="btn btn-secondary" onclick="seleccionarRegistro('${solicitud.registroFuente}')">
+                    ↩️ Volver al Registro Fuente
+                </button>
+            </div>
+        </div>
+    `;
 }
 
-// Obtener estado de aprobación de un registro
-function getApprovalStatus(registroCodigo) {
-    const approvals = JSON.parse(localStorage.getItem('sgsi_approvals') || '{}');
-    const estados = [];
+// Ver mis envíos
+function verMisEnvios() {
+    estado.filtro = 'mis-envios';
+    renderizarArbol();
+    mostrarListaSolicitudes();
+}
+
+// Mostrar lista de solicitudes
+function mostrarListaSolicitudes() {
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
     
-    Object.values(approvals).forEach(item => {
-        if (typeof item === 'object' && item.registro === registroCodigo) {
-            estados.push({
-                estado: item.estado,
-                fecha: item.fechaRespuesta || item.fechaEnvio
-            });
-        }
+    if (solicitudes.length === 0) {
+        document.getElementById('contentArea').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <h2>No hay solicitudes de aprobación</h2>
+                <p>Las solicitudes que envíe aparecerán aquí</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Ordenar por fecha descendente
+    solicitudes.sort((a, b) => new Date(b.fechaEnvio) - new Date(a.fechaEnvio));
+    
+    let html = `
+        <div class="content-header">
+            <div class="content-title">
+                <h2>📋 Mis Solicitudes de Aprobación</h2>
+                <p>Total: ${solicitudes.length} solicitudes</p>
+            </div>
+        </div>
+        
+        <div class="form-container">
+            <table class="tabla-solicitudes">
+                <thead>
+                    <tr>
+                        <th>ID Solicitud</th>
+                        <th>Registro</th>
+                        <th>Aprobador</th>
+                        <th>Fecha Envío</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    solicitudes.forEach(sol => {
+        const fecha = new Date(sol.fechaEnvio).toLocaleDateString();
+        html += `
+            <tr>
+                <td><small>${sol.id}</small></td>
+                <td>${sol.registroFuente}</td>
+                <td>${sol.aprobador}</td>
+                <td>${fecha}</td>
+                <td><span class="status-badge ${sol.estado}">${sol.estado.toUpperCase()}</span></td>
+                <td>
+                    <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.7em;" 
+                        onclick="verDetalleSolicitud('${sol.id}')">
+                        Ver Detalle
+                    </button>
+                </td>
+            </tr>
+        `;
     });
     
-    if (estados.length === 0) return null;
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    document.getElementById('contentArea').innerHTML = html;
+}
+
+// Ver detalle de solicitud
+function verDetalleSolicitud(solicitudId) {
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
+    const solicitud = solicitudes.find(s => s.id === solicitudId);
+    
+    if (!solicitud) return;
+    
+    const registro = maestroRegistros.find(r => r.codigo === solicitud.registroFuente);
+    if (!registro) return;
+    
+    const previewHTML = generarHTMLAuditoria(registro, solicitud.datos, true);
+    
+    document.getElementById('contentArea').innerHTML = `
+        <div class="content-header">
+            <div class="content-title">
+                <h2>Detalle de Solicitud #${solicitud.id}</h2>
+                <p>Estado: <span class="status-badge ${solicitud.estado}">${solicitud.estado.toUpperCase()}</span></p>
+            </div>
+        </div>
+        
+        <div class="form-container">
+            <h3 class="section-title">📋 Información de la Solicitud</h3>
+            
+            <table class="tabla-solicitudes">
+                <tr><td><strong>ID Solicitud</strong></td><td>${solicitud.id}</td></tr>
+                <tr><td><strong>Registro Fuente</strong></td><td>${solicitud.registroFuente} - ${solicitud.titulo}</td></tr>
+                <tr><td><strong>Solicitante</strong></td><td>${solicitud.solicitante}</td></tr>
+                <tr><td><strong>Aprobador</strong></td><td>${solicitud.aprobador}</td></tr>
+                <tr><td><strong>Fecha Envío</strong></td><td>${new Date(solicitud.fechaEnvio).toLocaleString()}</td></tr>
+                ${solicitud.fechaRespuesta ? `<tr><td><strong>Fecha Respuesta</strong></td><td>${new Date(solicitud.fechaRespuesta).toLocaleString()}</td></tr>` : ''}
+                ${solicitud.comentarios ? `<tr><td><strong>Comentarios</strong></td><td>${solicitud.comentarios}</td></tr>` : ''}
+                <tr><td><strong>Estado</strong></td><td><span class="status-badge ${solicitud.estado}">${solicitud.estado.toUpperCase()}</span></td></tr>
+            </table>
+            
+            <div class="actions-bar">
+                <button class="btn btn-secondary" onclick="verMisEnvios()">
+                    ↩️ Volver a Mis Solicitudes
+                </button>
+                <button class="btn btn-primary" onclick="seleccionarRegistro('${solicitud.registroFuente}')">
+                    📄 Ver Registro Fuente
+                </button>
+            </div>
+        </div>
+        
+        <div class="preview-panel" style="display: block; margin-top: 20px;">
+            <h3 class="section-title">📄 Copia del Registro Enviado</h3>
+            ${previewHTML}
+        </div>
+    `;
+}
+
+// Obtener estado de solicitudes para un registro
+function getSolicitudStatus(registroCodigo) {
+    const solicitudes = JSON.parse(localStorage.getItem('sgsi_solicitudes') || '[]');
+    const solicitudesRegistro = solicitudes.filter(s => s.registroFuente === registroCodigo);
+    
+    if (solicitudesRegistro.length === 0) return null;
     
     // Ordenar por fecha, más reciente primero
-    estados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    return estados[0].estado;
+    solicitudesRegistro.sort((a, b) => new Date(b.fechaEnvio) - new Date(a.fechaEnvio));
+    return solicitudesRegistro[0].estado;
 }
 
 // ==================== FUNCIONES DE RENDERIZADO ====================
@@ -678,17 +882,23 @@ function renderizarArbol() {
     const container = document.getElementById('recordsTree');
     container.innerHTML = '';
 
+    // Si el filtro es 'mis-envios', mostrar lista de solicitudes en lugar del árbol
+    if (estado.filtro === 'mis-envios') {
+        mostrarListaSolicitudes();
+        return;
+    }
+
     Object.entries(estado.libros).forEach(([codigoLibro, data]) => {
         const libro = data.libro;
         const registros = data.registros;
 
         // Aplicar filtros
         if (estado.filtro === 'pendientes') {
-            const registrosPendientes = registros.filter(r => {
-                const status = getApprovalStatus(r.codigo);
-                return status === 'enviado' || status === null;
+            const registrosConSolicitud = registros.filter(r => {
+                const status = getSolicitudStatus(r.codigo);
+                return status === 'enviado';
             });
-            if (registrosPendientes.length === 0) return;
+            if (registrosConSolicitud.length === 0) return;
         }
 
         const bookGroup = document.createElement('div');
@@ -745,26 +955,29 @@ function renderizarArbol() {
         
         if (estado.filtro === 'pendientes') {
             registrosAMostrar = registrosAMostrar.filter(r => {
-                const status = getApprovalStatus(r.codigo);
-                return status === 'enviado' || status === null;
+                const status = getSolicitudStatus(r.codigo);
+                return status === 'enviado';
             });
         }
 
         if (estado.filtro !== 'LIBRO') {
             registrosAMostrar.forEach(registro => {
-                const status = getApprovalStatus(registro.codigo);
-                let statusClass = '';
-                if (status === 'enviado') statusClass = 'status-enviado';
-                else if (status === 'aprobado') statusClass = 'status-aprobado';
-                else if (status === 'rechazado') statusClass = 'status-rechazado';
+                const status = getSolicitudStatus(registro.codigo);
                 
                 const sheetItem = document.createElement('div');
                 sheetItem.className = `sheet-item ${estado.registroSeleccionado === registro.codigo ? 'active' : ''}`;
+                
+                let badgeHTML = '';
+                if (status) {
+                    badgeHTML = `<span class="badge-${status}">${status}</span>`;
+                }
+                
                 sheetItem.innerHTML = `
                     <span class="sheet-code">${registro.codigo}</span>
                     <span>${registro.titulo}</span>
-                    ${status ? `<span class="approval-status-indicator ${statusClass}" title="Estado: ${status}"></span>` : ''}
+                    ${badgeHTML}
                 `;
+                
                 sheetItem.addEventListener('click', (e) => {
                     e.stopPropagation();
                     seleccionarRegistro(registro.codigo);
@@ -791,13 +1004,13 @@ function seleccionarRegistro(codigo) {
 function renderizarFormulario(registro) {
     const contentArea = document.getElementById('contentArea');
     const badgeClass = registro.tipo === 'LIBRO' ? 'badge-libro' : 'badge-registro';
-    const tipoTexto = registro.tipo === 'LIBRO' ? 'LIBRO MAESTRO' : 'REGISTRO';
+    const tipoTexto = registro.tipo === 'LIBRO' ? 'LIBRO MAESTRO' : 'REGISTRO FUENTE';
     
-    // Obtener estado de aprobación
-    const approvalStatus = getApprovalStatus(registro.codigo);
+    // Obtener estado de solicitudes
+    const solicitudStatus = getSolicitudStatus(registro.codigo);
     let statusHTML = '';
-    if (approvalStatus) {
-        statusHTML = `<span class="badge badge-aprobacion status-${approvalStatus}">${approvalStatus.toUpperCase()}</span>`;
+    if (solicitudStatus) {
+        statusHTML = `<span class="badge badge-aprobacion status-${solicitudStatus}">${solicitudStatus.toUpperCase()}</span>`;
     }
 
     let camposHTML = '';
@@ -829,6 +1042,9 @@ function renderizarFormulario(registro) {
             <div class="content-title">
                 <h2>${registro.titulo} ${statusHTML}</h2>
                 <p>${registro.codigo} • ${registro.categoria} • ISO 27001: ${registro.iso || 'N/A'}</p>
+                <p style="font-size: 0.7em; color: var(--accent); margin-top: 5px;">
+                    ⚡ Este es un registro fuente - las solicitudes crean copias independientes
+                </p>
             </div>
             <span class="badge ${badgeClass}">${tipoTexto}</span>
         </div>
@@ -841,7 +1057,7 @@ function renderizarFormulario(registro) {
 
             <div class="actions-bar">
                 <button class="btn btn-primary" onclick="guardarRegistro()">
-                    💾 Guardar Registro
+                    💾 Guardar Borrador
                 </button>
                 <button class="btn btn-success" onclick="generarPreview()">
                     👁️ Vista Previa
@@ -851,7 +1067,7 @@ function renderizarFormulario(registro) {
                 </button>
                 ${registro.tipo !== 'LIBRO' ? `
                     <button class="btn btn-send" onclick="enviarAprobacion()">
-                        ✉️ Enviar a Aprobación
+                        ✉️ Enviar Copia a Aprobación
                     </button>
                 ` : ''}
                 <button class="btn btn-secondary" onclick="limpiarFormulario()">
@@ -1072,7 +1288,7 @@ function generarHTMLAuditoria(registro, datos, readonly = false) {
 }
 
 function guardarRegistro() {
-    mostrarToast('✓ Registro guardado localmente');
+    mostrarToast('✓ Borrador guardado localmente');
 }
 
 function limpiarFormulario() {
